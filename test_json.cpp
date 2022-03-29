@@ -65,6 +65,8 @@ int RGW_send_data(const char* object_name, std::string & result)
 
   std::ifstream input_file_stream;
   MyHandler handler;
+  //handler.filter = {"address"};
+  handler.filter = {"phoneNumbers"};
   size_t buff_sz{1024*1024*4};
   char* buff = (char*)malloc(buff_sz);
 
@@ -90,6 +92,8 @@ int RGW_send_data(const char* object_name, std::string & result)
   handler.process_rgw_buffer(0, 0, true);
 
   result = handler.get_full_result();
+
+  std::cout<< handler.get_filter_result();
   return 0;
 }
 
@@ -98,7 +102,7 @@ int test_compare(int argc, char* argv[])
   std::string res;
   std::ofstream o1,o2;
  
-  RGW_send_data(argv[1],res);
+  RGW_send_data(argv[1], res);
 
   std::string res2 = parse_json_dom(argv[1]);
 
@@ -118,7 +122,7 @@ int test_compare(int argc, char* argv[])
 int main(int argc,char **argv)
 {
   std::string res;
-  RGW_send_data(argv[1],res);
+  RGW_send_data(argv[1], res);
    
   //std::cout << res; 
 }

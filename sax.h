@@ -212,12 +212,16 @@ class MyHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, MyHandl
   public:
 
     std::vector < std::pair < std::string, Valuesax>> mymap;
+    std::vector < std::pair < std::string, Valuesax>> filtermap;
+    std::vector <std::string> filter{};
+    bool counter{};
     Valuesax value;
     ChunksStreamer stream_buffer;
     bool init_buffer_stream;
     rapidjson::Reader reader;
     std::vector<en_json_elm_state_t> json_element_state;
     std::string m_result;
+    std::string m_filter_result{};
     std::vector<std::string> gs_key_stack;
 
     MyHandler() : init_buffer_stream(false)
@@ -236,10 +240,15 @@ class MyHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, MyHandl
 
     void emptyhandler() {
       mymap.clear();
+      filtermap.clear();
     }
 
     std::vector < std::pair < std::string, Valuesax>> get_mykeyvalue() {
       return mymap;
+    }
+
+    std::vector < std::pair < std::string, Valuesax>> get_filtervalue() {
+      return filtermap;
     }
 
     void dec_key_path()
@@ -249,11 +258,17 @@ class MyHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, MyHandl
 	  if(gs_key_stack.size() != 0)
 	    gs_key_stack.pop_back();
 	}
+  if (gs_key_stack != filter) {
+    counter = false;
+  }
     }
 
     void push_new_key_value(Valuesax& v)//TODO should be reference
     {
       mymap.push_back(std::make_pair(get_key_path(), v));
+      if (counter) {
+        filtermap.push_back(std::make_pair(get_key_path(), v));
+      }
       dec_key_path();
     }
 
@@ -294,6 +309,9 @@ class MyHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, MyHandl
 
     bool Key(const char* str, rapidjson::SizeType length, bool copy) {
       gs_key_stack.push_back(std::string(str));
+      if (gs_key_stack == filter) {
+        counter = true;
+      }
       return true;
     }
 
@@ -328,6 +346,7 @@ class MyHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, MyHandl
     {//RGW keeps calling with buffers, this method is not aware of object size
 
       std::stringstream result;
+      std::stringstream filter_result;
 
       if(!init_buffer_stream)
       {
@@ -359,12 +378,34 @@ class MyHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, MyHandl
 	    default: break;
 	  }
 	}
+  
+  filter_result.str("");
+  for (const auto& i : this->get_filtervalue()) {
+	//debug purpose only 
+	
+	  /// pushing the key-value into s3select object. that s3seelct-object should filter according to from-clause and projection defintions
+	  //  this object could remain empty (no key-value matches the search-pattern)
+	  switch(i.second.type()) {
+	    case Valuesax::Decimal: filter_result << i.first << " : " << i.second.asInt() << "\n"; break;
+	    case Valuesax::Double: filter_result << i.first << " : " << i.second.asDouble() << "\n"; break;
+	    case Valuesax::String: filter_result << i.first << " : " << i.second.asString() << "\n"; break;
+	    case Valuesax::Bool: filter_result << i.first << " : " << std::boolalpha << i.second.asBool() << "\n"; break;
+	    case Valuesax::Null: filter_result << i.first << " : " << "null" << "\n"; break;
+	    default: break;
+	  }
+	}
 
 	//print result (actually its calling to s3select for processing. the s3slect-object may contain zero matching key-values)
 	if(result.str().size())
 	{
 	    //std::cout << result.str();// << std::endl;
-	   // m_result.append(result.str());
+	   m_result.append(result.str());
+	}
+
+  if(filter_result.str().size())
+	{
+	    //std::cout << result.str();// << std::endl;
+	   m_filter_result.append(filter_result.str());
 	}
 
 	//once all key-values move into s3select(for further filtering and processing), it should be cleared
@@ -393,6 +434,24 @@ class MyHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, MyHandl
     {
       return m_result;
     }  
+
+    std::string& get_filter_result()
+    {
+      if (m_filter_result.size()) {
+        std::cout<<"match found\n";
+      } else {
+        std::cout<<"no match\n";
+      }
+      return m_filter_result;
+    }
+/*
+    enum class match_type_en {ANY,MATCH} ;
+    bool filter(std::vector< std::pair<match_type_en,std::string> > match_pattern)
+    {
+      //return true/false upon match  
+      // ANY (like *) mean any string matches, MATCH means both strings are equal.
+      return true;
+    }*/
 
 };
 
