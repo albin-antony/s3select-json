@@ -60,12 +60,14 @@ std::string parse_json_dom(const char* file_name)
 }
 
 
-void RGW_send_data(const char* object_name)
+int RGW_send_data(const char* object_name, std::string & result)
 {//purpose: simulate RGW streaming an object into s3select
 
   std::ifstream input_file_stream;
   MyHandler handler;
-  size_t buff_sz{4096};
+  //handler.filter = {"address"};
+  handler.filter = {"phoneNumbers"};
+  size_t buff_sz{1024*1024*4};
   char* buff = (char*)malloc(buff_sz);
 
   try {
@@ -81,17 +83,47 @@ void RGW_send_data(const char* object_name)
   while(read_size)
   {
     //the handler is processing any buffer size
-    handler.process_rgw_buffer(buff, read_size);
+    int status = handler.process_rgw_buffer(buff, read_size);
+    if(status<0) return -1;
     
     //read next chunk
     read_size = input_file_stream.readsome(buff, buff_sz);
   }
+  handler.process_rgw_buffer(0, 0, true);
 
-}
+  result = handler.get_full_result();
 
-int main(int argc, char* argv[])
-{
-  RGW_send_data(argv[1]);
-
+  std::cout<< handler.get_filter_result();
   return 0;
 }
+
+int test_compare(int argc, char* argv[])
+{
+  std::string res;
+  std::ofstream o1,o2;
+ 
+  RGW_send_data(argv[1], res);
+
+  std::string res2 = parse_json_dom(argv[1]);
+
+  o1.open(std::string(argv[1]).append(".sax.out"));
+  o2.open(std::string(argv[1]).append(".dom.out"));
+
+
+  o1 << res;
+  o2 << res2;
+
+  o1.close();
+  o2.close();
+  
+  return 0;
+}
+
+int main(int argc,char **argv)
+{
+  std::string res;
+  RGW_send_data(argv[1], res);
+   
+  //std::cout << res; 
+}
+

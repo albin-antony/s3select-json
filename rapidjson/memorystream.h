@@ -42,6 +42,8 @@ struct MemoryStream {
 
     MemoryStream(const Ch *src, size_t size) : src_(src), begin_(src), end_(src + size), size_(size) {}
 
+    virtual ~MemoryStream(){}
+
     Ch Peek() const { return RAPIDJSON_UNLIKELY(src_ == end_) ? '\0' : *src_; }
     Ch Take() { return RAPIDJSON_UNLIKELY(src_ == end_) ? '\0' : *src_++; }
     size_t Tell() const { return static_cast<size_t>(src_ - begin_); }
